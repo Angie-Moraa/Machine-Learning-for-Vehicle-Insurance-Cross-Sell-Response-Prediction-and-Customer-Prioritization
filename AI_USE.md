@@ -3,7 +3,7 @@
 **Student:** Angela Moraa Omweri (223763) · DSA 8401 Applied Machine Learning
 
 ## Tool used
-Claude (Anthropic), used as an assistant through the Claude app in November 2026.
+Claude.
 
 ## What I did myself
 - Chose the problem and dataset, and wrote and submitted the proposal. 
