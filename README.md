@@ -5,6 +5,10 @@ Predicts whether an existing **life-insurance policyholder** will take up a **ve
 
 **DSA 8401 – Applied Machine Learning capstone · Strathmore University**
 
+**🔗 Live demo:** https://vehicle-insurance-cross-sell.onrender.com · [API docs](https://vehicle-insurance-cross-sell.onrender.com/docs)
+
+> Hosted on Render's free plan. The first visit after 15 minutes of inactivity can take about a minute while the app wakes up.
+
 ---
 
 ## Problem
