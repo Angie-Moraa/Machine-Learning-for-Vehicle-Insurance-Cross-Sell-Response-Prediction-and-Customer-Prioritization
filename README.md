@@ -84,6 +84,23 @@ Features: gender, date of birth, driving licence, sub-county, previously insured
 - **Age** has a non-linear effect: middle-aged customers respond most (peak at 35–55).
 - **Gender** has almost no direct effect. **Vehicle age** and the **premium floor flag** add nothing.
 
+## Architecture
+
+```mermaid
+flowchart LR
+    A[Raw CSV files] --> B[Ingestion<br/>70/15/15 split by date]
+    B --> C[Validation<br/>EDA rules check]
+    C --> D[Transformation<br/>features + encoders]
+    D --> E[Training<br/>tune, calibrate, threshold]
+    E -. logs every run .-> M[(MLflow)]
+    E --> F{Quality gate<br/>test PR-AUC ≥ 0.25}
+    F -->|pass| G[final_model/model.pkl]
+    G --> H[SHAP charts]
+    G --> I[Ranked call list<br/>predictions.csv]
+    G --> J[FastAPI<br/>/predict /health]
+    J --> K[Docker image]
+    K --> L[Render<br/>public URL]
+```
 ## Project structure
 
 ```
