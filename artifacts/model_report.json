@@ -6,8 +6,8 @@
       "best_params": {}
     },
     "Logistic Regression": {
-      "train_pr_auc": 0.34732613441416,
-      "val_pr_auc": 0.33744719855507105,
+      "train_pr_auc": 0.3473759555668872,
+      "val_pr_auc": 0.33767791399365993,
       "best_params": {
         "model__C": 10.0
       }
