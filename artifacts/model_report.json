@@ -1,0 +1,69 @@
+{
+  "models": {
+    "Baseline (Dummy)": {
+      "train_pr_auc": 0.1227342913793406,
+      "val_pr_auc": 0.12096540893499194,
+      "best_params": {}
+    },
+    "Logistic Regression": {
+      "train_pr_auc": 0.34732613441416,
+      "val_pr_auc": 0.33744719855507105,
+      "best_params": {
+        "model__C": 10.0
+      }
+    },
+    "Random Forest": {
+      "train_pr_auc": 0.3766528725829395,
+      "val_pr_auc": 0.35265927706108496,
+      "best_params": {}
+    },
+    "LightGBM": {
+      "train_pr_auc": 0.3751887490341664,
+      "val_pr_auc": 0.3562167021096937,
+      "best_params": {
+        "model__num_leaves": 31,
+        "model__n_estimators": 200,
+        "model__min_child_samples": 50,
+        "model__learning_rate": 0.05
+      }
+    }
+  },
+  "best_model": "LightGBM",
+  "agent_check": {
+    "with_agent": 0.3562167021096937,
+    "without_agent": 0.3423713767115409
+  },
+  "calibration": {
+    "brier_before": 0.17353982032470006,
+    "brier_after": 0.08644254759962479
+  },
+  "threshold": 0.22,
+  "test_metrics": {
+    "pr_auc": 0.3621946567741779,
+    "roc_auc": 0.8544380907131828,
+    "recall": 0.7739896890071511,
+    "precision": 0.32620733160440174,
+    "f1": 0.45897435897435895,
+    "top_10pct_lift": 3.096495250382987,
+    "brier": 0.08833377303212042,
+    "share_contacted": 0.2965619023862975
+  },
+  "fairness_by_gender": {
+    "Female": {
+      "customers": 22059,
+      "base_rate": 0.10793780316424136,
+      "share_contacted": 0.2389500883992928,
+      "recall": 0.75052498950021,
+      "precision": 0.3390248529690761
+    },
+    "Male": {
+      "customers": 26049,
+      "base_rate": 0.13942953664248148,
+      "share_contacted": 0.34534914967945024,
+      "recall": 0.7893722466960352,
+      "precision": 0.31869719875500224
+    },
+    "contact_rate_ratio": 0.6919087208440616,
+    "recall_gap": 0.03884725719582527
+  }
+}
