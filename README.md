@@ -46,6 +46,8 @@ Features: gender, date of birth, driving licence, sub-county, previously insured
 
 ## Results
 
+📄 **Full report:** [reports/MACHINE_LEARNING_CAPSTONE_PROJECT.pdf](reports/MACHINE_LEARNING_CAPSTONE_PROJECT.pdf)
+
 **Validation PR-AUC by model** (random baseline = 0.121):
 
 | Model | Validation PR-AUC |
