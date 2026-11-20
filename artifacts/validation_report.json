@@ -1,0 +1,27 @@
+{
+  "train": {
+    "rows": 227964,
+    "issues": [],
+    "warnings": []
+  },
+  "validation": {
+    "rows": 48394,
+    "issues": [],
+    "warnings": [
+      "1 unseen Agent_name values"
+    ]
+  },
+  "test": {
+    "rows": 48108,
+    "issues": [],
+    "warnings": [
+      "1 unseen Agent_name values"
+    ]
+  },
+  "score": {
+    "rows": 56643,
+    "issues": [],
+    "warnings": []
+  },
+  "passed": true
+}

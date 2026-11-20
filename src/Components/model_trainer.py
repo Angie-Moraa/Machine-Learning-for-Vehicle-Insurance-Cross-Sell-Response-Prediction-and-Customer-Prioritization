@@ -18,18 +18,48 @@ from src.utils import (save_object, save_json, evaluate_models, classification_m
                        choose_threshold, fairness_report)
 from src.Components.data_transformation import DataTransformation
 
+try:
+    import mlflow
+    HAS_MLFLOW = True
+except ImportError:
+    HAS_MLFLOW = False
+
 
 @dataclass
 class ModelTrainerConfig:
     trained_model_file_path: str = os.path.join("artifacts", "model.pkl")
     report_file_path: str = os.path.join("artifacts", "model_report.json")
-    min_val_pr_auc: float = 0.25   # about 2x the 12% base rate; like the tutorial's "score < 0.6" check
+    min_val_pr_auc: float = 0.25
     random_state: int = 42
+    mlflow_tracking_uri: str = "sqlite:///mlflow.db"
+    mlflow_experiment: str = "vehicle-insurance-cross-sell"
 
 
 class ModelTrainer:
     def __init__(self):
         self.model_trainer_config = ModelTrainerConfig()
+
+    def log_to_mlflow(self, model_report, report):
+        """One parent run per training, with a child run for every model."""
+        cfg = self.model_trainer_config
+        mlflow.set_tracking_uri(cfg.mlflow_tracking_uri)
+        mlflow.set_experiment(cfg.mlflow_experiment)
+
+        with mlflow.start_run(run_name=f"pipeline - best {report['best_model']}"):
+            for name, r in model_report.items():
+                with mlflow.start_run(run_name=name, nested=True):
+                    mlflow.log_params({k.replace("model__", ""): v for k, v in r["best_params"].items()})
+                    mlflow.log_metrics({"train_pr_auc": r["train_pr_auc"], "val_pr_auc": r["val_pr_auc"]})
+
+            mlflow.log_params({"best_model": report["best_model"], "threshold": report["threshold"]})
+            mlflow.log_metrics({f"test_{k}": v for k, v in report["test_metrics"].items()})
+            mlflow.log_metrics({f"calibration_{k}": v for k, v in report["calibration"].items()})
+            mlflow.log_metrics({f"agent_{k}": v for k, v in report["agent_check"].items()})
+            mlflow.log_metrics({"fairness_contact_rate_ratio": report["fairness_by_gender"]["contact_rate_ratio"],
+                                "fairness_recall_gap": report["fairness_by_gender"]["recall_gap"]})
+            mlflow.log_artifact(cfg.report_file_path)
+            mlflow.log_artifact(cfg.trained_model_file_path)
+        logging.info("Logged run to MLflow")
 
     def initiate_model_trainer(self, splits):
         try:
@@ -45,7 +75,6 @@ class ModelTrainer:
             def get_preprocessor(kind, use_agent=True):
                 return transformation.get_data_transformer_object(kind, use_agent=use_agent, premium_cap=cap)
 
-            # name -> (preprocessor kind, model); class weights handle the 7:1 imbalance
             models = {
                 "Baseline (Dummy)": ("tree", DummyClassifier(strategy="prior")),
                 "Logistic Regression": ("linear", LogisticRegression(class_weight="balanced", max_iter=2000)),
@@ -55,7 +84,6 @@ class ModelTrainer:
                 "LightGBM": ("tree", LGBMClassifier(
                     class_weight="balanced", random_state=cfg.random_state, verbose=-1)),
             }
-            # Random Forest is not tuned: each fit is slow and the notebook showed little gain from tuning
             params = {
                 "Logistic Regression": {"model__C": [0.01, 0.1, 1.0, 10.0]},
                 "LightGBM": {
@@ -71,7 +99,6 @@ class ModelTrainer:
                                                    get_preprocessor=get_preprocessor,
                                                    random_state=cfg.random_state)
 
-            ## best model by validation PR-AUC (baseline excluded)
             candidates = {k: v["val_pr_auc"] for k, v in model_report.items() if not k.startswith("Baseline")}
             best_model_name = max(candidates, key=candidates.get)
             best_model_score = candidates[best_model_name]
@@ -81,7 +108,7 @@ class ModelTrainer:
                 raise Exception(f"No good model found: best validation PR-AUC {best_model_score:.4f}")
             logging.info(f"Best model: {best_model_name} (validation PR-AUC {best_model_score:.4f})")
 
-            ## agent-as-proxy check: same model without the agent column
+            # agent-as-proxy check
             kind = models[best_model_name][0]
             no_agent = Pipeline([("preprocessor", get_preprocessor(kind, use_agent=False)),
                                  ("model", clone(best_model.named_steps["model"]))])
@@ -90,9 +117,8 @@ class ModelTrainer:
                 "with_agent": best_model_score,
                 "without_agent": float(average_precision_score(y_val, no_agent.predict_proba(X_val)[:, 1])),
             }
-            logging.info(f"Agent check: {agent_check}")
 
-            ## calibration (sigmoid keeps the ranking) and threshold, both on validation
+            # calibration and threshold on validation
             calibrated = CalibratedClassifierCV(FrozenEstimator(best_model), method="sigmoid")
             calibrated.fit(X_val, y_val)
             val_prob = calibrated.predict_proba(X_val)[:, 1]
@@ -101,18 +127,17 @@ class ModelTrainer:
                 "brier_before": float(brier_score_loss(y_val, best_model.predict_proba(X_val)[:, 1])),
                 "brier_after": float(brier_score_loss(y_val, val_prob)),
             }
-            logging.info(f"Calibration: {calibration}; threshold {threshold}")
 
-            ## sealed test window: scored once
+            # sealed test window, scored once
             test_prob = calibrated.predict_proba(X_test)[:, 1]
             test_metrics = classification_metrics(y_test, test_prob, threshold)
             fairness = fairness_report(y_test, test_prob, splits["test"]["gender"], threshold)
             logging.info(f"Test metrics: {test_metrics}")
-            logging.info(f"Fairness: {fairness}")
 
             save_object(
                 file_path=cfg.trained_model_file_path,
-                obj={"model": calibrated, "threshold": threshold, "model_name": best_model_name},
+                obj={"model": calibrated, "base_model": best_model,
+                     "threshold": threshold, "model_name": best_model_name},
             )
             report = {
                 "models": model_report,
@@ -124,10 +149,13 @@ class ModelTrainer:
                 "fairness_by_gender": fairness,
             }
             save_json(cfg.report_file_path, report)
-            logging.info("Saved model and report")
+
+            if HAS_MLFLOW:
+                self.log_to_mlflow(model_report, report)
+            else:
+                logging.warning("mlflow not installed: run not tracked")
 
             return test_metrics["pr_auc"], report
-
         except Exception as e:
             raise CustomException(e, sys)
 
@@ -138,8 +166,5 @@ if __name__ == "__main__":
     train_path, val_path, test_path, score_path = DataIngestion().initiate_data_ingestion()
     splits, _ = DataTransformation().initiate_data_transformation(train_path, val_path, test_path)
     test_pr_auc, report = ModelTrainer().initiate_model_trainer(splits)
-
     print("\nBest model:", report["best_model"])
-    print("Threshold:", report["threshold"])
-    print("Agent check:", {k: round(v, 4) for k, v in report["agent_check"].items()})
     print("Test metrics:", {k: round(v, 4) for k, v in report["test_metrics"].items()})
